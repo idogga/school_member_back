@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,26 @@ namespace School.Member.Api
     {
         public static void Main(string[] args)
         {
-            CreateHostBuilder(args).Build().Run();
+            var config = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json")
+                .Build();
+
+            try
+            {
+                Console.WriteLine("Starting application...");
+                var host = CreateHostBuilder(args).Build();
+                Migrate(host.Services);
+                host.Run();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Application crashed.");
+                Console.WriteLine(ex);
+            }
+            finally
+            {
+                Console.WriteLine("Application shut down.");
+            }        
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
