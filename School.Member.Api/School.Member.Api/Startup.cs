@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.OpenApi.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,15 +26,24 @@ namespace School.Member.Api
         public IConfiguration Configuration { get; }
 
         public void ConfigureServices(IServiceCollection services)
-        {            
-            services.AddLogging();
+        {                        
+            services.AddControllers();
 
-            services.AddGrpc();
+            services.AddLogging();
             services.AddDbContext<MemberDbContext>(opt => {
-                Console.WriteLine($"Connesction string: {dbConfig.ConnectionString}");
                 opt.UseNpgsql(dbConfig.ConnectionString)
                     .EnableSensitiveDataLogging(true);
             });
+
+            services.AddAutoMapper(cfg => 
+            {
+                cfg.AddProfile(new PupilProfile());
+            });
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo { Title = "WebApi", Version = "v1" });
+            });
+            services.AddScoped<IPupilService, PupilService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -45,16 +55,12 @@ namespace School.Member.Api
             }
 
             app.UseRouting();
+            app.UseSwagger();
+            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "WebApi v1"));
+            app.UseAuthorization();
+            app.UseAuthentication();
 
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapGrpcService<GreeterService>();
-
-                endpoints.MapGet("/", async context =>
-                {
-                    await context.Response.WriteAsync("Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
-                });
-            });
+            app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
         }
     }
 }

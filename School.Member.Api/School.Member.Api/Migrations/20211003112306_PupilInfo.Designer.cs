@@ -2,15 +2,17 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace School.Member.Api.Migrations
 {
     [DbContext(typeof(MemberDbContext))]
-    partial class MemberDbContextModelSnapshot : ModelSnapshot
+    [Migration("20211003112306_PupilInfo")]
+    partial class PupilInfo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,7 +36,7 @@ namespace School.Member.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Pupils");
+                    b.ToTable("Teachers");
                 });
 
             modelBuilder.Entity("User", b =>

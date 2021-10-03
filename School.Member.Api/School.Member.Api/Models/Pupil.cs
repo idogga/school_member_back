@@ -10,5 +10,5 @@ public class Pupil : Model
 
     public virtual User User{get;set;}
 
-    
+    public DateTime DateOfBorn{get;set;}
 }
