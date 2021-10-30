@@ -2,9 +2,8 @@ using System;
 
 public record PupilDto
 {
-    public Guid Id { get; set; }
-
-    public string Email { get; set; }
-    public string FirstName { get; set; } = null!;
-    public string LastName { get; set; } = null!;
+    public Guid Id { get; init; }
+    public string Email { get; init; } = null!;
+    public string FirstName { get; init; } = null!;
+    public string LastName { get; init; } = null!;
 }

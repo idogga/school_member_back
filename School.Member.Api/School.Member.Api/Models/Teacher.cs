@@ -9,7 +9,7 @@ public class Teacher : Model
 
     public Guid UserId {get;set;}
 
-    public virtual User User{get;set;}
+    public virtual User User { get; set; } = null!;
 
-    public string Synonim {get;set;}
+    public string Synonim { get; set; } = null!;
 }

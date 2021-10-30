@@ -14,7 +14,7 @@ public class PupilController : Controller
     }
 
     [HttpPost]
-    public Task<PupilDto> Create(CreatePupilDto createPupilDto)
+    public Task<PupilDto> Create([FromBody] CreatePupilDto createPupilDto)
     {
         return pupilService.Create(createPupilDto);
     }
