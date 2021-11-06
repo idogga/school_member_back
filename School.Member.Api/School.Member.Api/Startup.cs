@@ -58,12 +58,14 @@ namespace School.Member.Api
             services.AddAutoMapper(cfg => 
             {
                 cfg.AddProfile(new PupilProfile());
+                cfg.AddProfile(new TeachersProfile());
             });
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "WebApi", Version = "v1" });
             });
             services.AddScoped<IPupilService, PupilService>();
+            services.AddScoped<ITeachersService, TeachersService>();
             services.AddSingleton<KeycloakConfig>(keycloakConfig);
             services.AddHttpClient<IKeycloakService, KeycloakService>(client =>
             {
@@ -78,6 +80,7 @@ namespace School.Member.Api
             {
                 app.UseDeveloperExceptionPage();
             }
+            app.UseCors( c => c.AllowAnyOrigin().AllowAnyHeader().AllowAnyHeader());
             app.UseForwardedHeaders();
             app.UseHttpsRedirection();
             app.UseRouting();

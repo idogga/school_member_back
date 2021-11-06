@@ -10,6 +10,7 @@ public class PupilService : IPupilService
     private readonly MemberDbContext dbContext;
     private readonly IKeycloakService keycloakService;
     private readonly IMapper mapper;
+    private const string GROUP_NAME = "pupils";
 
     public PupilService(
         MemberDbContext dbContext,
@@ -23,8 +24,9 @@ public class PupilService : IPupilService
 
     public async Task<PupilDto> Create(CreatePupilDto createPupilDto)
     {
-        await keycloakService.CanCreateUser(createPupilDto);
+        await keycloakService.CanCreateUser(createPupilDto.Email);
         var user = await keycloakService.CreateUser(createPupilDto);
+        await keycloakService.AddUserToGroup(user.Id, GROUP_NAME);
         var pupil = new Pupil(Guid.NewGuid())
         {
             User = user,

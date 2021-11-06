@@ -1,11 +1,11 @@
 using AutoMapper;
 
-public class PupilProfile : Profile
+public class TeachersProfile : Profile
 {
-    public PupilProfile()
+    public TeachersProfile()
     {
         AllowNullCollections = true;
-        CreateMap<Pupil, PupilDto>()
+        CreateMap<Teacher, TeacherDto>()
             .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email));
     }
 }

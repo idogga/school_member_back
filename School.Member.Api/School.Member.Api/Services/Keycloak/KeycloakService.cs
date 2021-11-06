@@ -20,10 +20,10 @@ public class KeycloakService : IKeycloakService
         this.keycloakConfig = keycloakConfig;
     }
 
-    public async Task CanCreateUser(CreatePupilDto createPupilDto)
+    public async Task CanCreateUser(string userEmail)
     {
         var token = await GetToken();
-        var uri = $"auth/admin/realms/{keycloakConfig.Realm}/users?email={createPupilDto.Email}";
+        var uri = $"auth/admin/realms/{keycloakConfig.Realm}/users?email={userEmail}";
         var request = new HttpRequestMessage(
             HttpMethod.Get,
             uri);
@@ -35,53 +35,53 @@ public class KeycloakService : IKeycloakService
         var users = JsonSerializer.Deserialize<IEnumerable<KCUserDto>>(result);
         if (users?.Any() == true)
         {
-            throw new ApplicationException("Useralready exists");
+            throw new ApplicationException("User already exists");
         }
     }
 
-    public async Task<User> CreateUser(CreatePupilDto createPupilDto)
+    public async Task<User> CreateUser(IUserDto createPupilDto)
     {
         var token = await GetToken();
-            var uri = $"auth/admin/realms/{keycloakConfig.Realm}/users";
-            var payload = new 
-            {
-                username = createPupilDto.Email,
-                emailVerified = false,
-                enabled = true,
-                firstName = createPupilDto.FirstName,
-                lastName = createPupilDto.LastName,
-                email = createPupilDto.Email
-            };
-            
-            var json = JsonSerializer.Serialize(payload);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var request = new HttpRequestMessage(
-                HttpMethod.Post,
-                uri);
-            request.Content = content;
-            request.Headers.Authorization = new AuthenticationHeaderValue(
-                "Bearer", token);
-            var response = await client.SendAsync(request);
-            await CheckResponse(response);
+        var uri = $"auth/admin/realms/{keycloakConfig.Realm}/users";
+        var payload = new
+        {
+            username = createPupilDto.Email,
+            emailVerified = false,
+            enabled = true,
+            firstName = createPupilDto.FirstName,
+            lastName = createPupilDto.LastName,
+            email = createPupilDto.Email
+        };
 
-            var location = response.Headers.Location;
+        var json = JsonSerializer.Serialize(payload);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            uri);
+        request.Content = content;
+        request.Headers.Authorization = new AuthenticationHeaderValue(
+            "Bearer", token);
+        var response = await client.SendAsync(request);
+        await CheckResponse(response);
 
-            if (location == null
-                || !Guid.TryParse(location.Segments.Last(), out var userKeycloakId))
-            {
-                throw new ApplicationException("Can't get user id");
-            }
+        var location = response.Headers.Location;
 
-            await SendVerificationEmail(userKeycloakId);
+        if (location == null
+            || !Guid.TryParse(location.Segments.Last(), out var userKeycloakId))
+        {
+            throw new ApplicationException("Can't get user id");
+        }
 
-            var user = new User(userKeycloakId)
-            {
-                Email = createPupilDto.Email
-            };
-            return user;
+        await SendVerificationEmail(userKeycloakId);
+
+        var user = new User(userKeycloakId)
+        {
+            Email = createPupilDto.Email
+        };
+        return user;
     }
 
-    public async  Task Delete(User user)
+    public async Task Delete(User user)
     {
         var token = await GetToken();
         var uri = $"auth/admin/realms/{keycloakConfig.Realm}/users/{user.Id}";
@@ -95,55 +95,78 @@ public class KeycloakService : IKeycloakService
     }
 
     public async Task<string> GetToken()
+    {
+        var uri = $"auth/realms/{keycloakConfig.Realm}/protocol/openid-connect/token";
+        var request = new HttpRequestMessage(
+               HttpMethod.Post,
+               uri);
+        request.Content = new StringContent(
+            $"client_secret={keycloakConfig.KeycloakSecret}&client_id={keycloakConfig.KeycloakClient}&grant_type=client_credentials",
+            Encoding.UTF8,
+            "application/x-www-form-urlencoded");
+        var response = await client.SendAsync(request);
+        await CheckResponse(response);
+
+        var json = await response.Content.ReadAsStringAsync();
+        var token = JObject.Parse(json);
+
+        return (string)token["access_token"];
+    }
+
+    public async Task AddUserToGroup(Guid userId, string groupName)
+    {
+        var groupId = await FindGroupIdByName(groupName);
+        var token = await GetToken();
+        var uri = $"auth/admin/realms/{keycloakConfig.Realm}/users/{userId}/groups/{groupId}";
+        var request = new HttpRequestMessage(HttpMethod.Put, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await client.SendAsync(request);
+        await CheckResponse(response);
+    }
+
+    private async Task CheckResponse(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
         {
-            var uri = $"auth/realms/{keycloakConfig.Realm}/protocol/openid-connect/token";
-            var request = new HttpRequestMessage(
-                   HttpMethod.Post,
-                   uri);
-            request.Content = new StringContent(
-                $"client_secret={keycloakConfig.KeycloakSecret}&client_id={keycloakConfig.KeycloakClient}&grant_type=client_credentials",
-                Encoding.UTF8,
-                "application/x-www-form-urlencoded");
-            var response = await client.SendAsync(request);
-            await CheckResponse(response);
-
-            var json = await response.Content.ReadAsStringAsync();
-            var token = JObject.Parse(json);
-
-            return (string)token["access_token"];
+            return;
         }
 
-        
-        private async Task CheckResponse(HttpResponseMessage response)
-        {
-            if (response.IsSuccessStatusCode)
-            {
-                return;
-            }
+        var content = await response.Content.ReadAsStringAsync();
+        throw new ApplicationException(content);
+    }
 
-            var content = await response.Content.ReadAsStringAsync();
-            throw new ApplicationException(content);
-        }
-    
 
-        private async Task SendVerificationEmail(Guid userId)
-        {
-            var redirectLink = keycloakConfig.RedirectUrl!.Replace("USER_ID", userId.ToString());
-            var lifespan = 48 * 60 * 60;
-            var token = await GetToken();
-            var uri = $"auth/admin/realms/{keycloakConfig.Realm}/users/{userId}/execute-actions-email?redirect_uri={redirectLink}&client_id={keycloakConfig.KeycloakClient}&lifespan={lifespan}";
-            var payload = new[] { "VERIFY_EMAIL" };
-            var json = JsonSerializer.Serialize(payload);
+    private async Task SendVerificationEmail(Guid userId)
+    {
+        var redirectLink = keycloakConfig.RedirectUrl!.Replace("USER_ID", userId.ToString());
+        var lifespan = 48 * 60 * 60;
+        var token = await GetToken();
+        var uri = $"auth/admin/realms/{keycloakConfig.Realm}/users/{userId}/execute-actions-email?redirect_uri={redirectLink}&client_id={keycloakConfig.KeycloakClient}&lifespan={lifespan}";
+        var payload = new[] { "VERIFY_EMAIL", "UPDATE_PASSWORD" };
+        var json = JsonSerializer.Serialize(payload);
 
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var request = new HttpRequestMessage(
-                   HttpMethod.Put,
-                   uri);
-            request.Content = content;
-            request.Headers.Authorization = new AuthenticationHeaderValue(
-                "Bearer", token);
-            var response = await client.SendAsync(request);
-            await CheckResponse(response);
-        }
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var request = new HttpRequestMessage(
+               HttpMethod.Put,
+               uri);
+        request.Content = content;
+        request.Headers.Authorization = new AuthenticationHeaderValue(
+            "Bearer", token);
+        var response = await client.SendAsync(request);
+        await CheckResponse(response);
+    }
 
+    private async Task<Guid> FindGroupIdByName(string groupName)
+    {
+        var token = await GetToken();
+        var uri = $"auth/admin/realms/{keycloakConfig.Realm}/groups?search={groupName}";
+        var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await client.SendAsync(request);
+        await CheckResponse(response);
+        var content = await response.Content.ReadAsStringAsync();
+        var groups = JsonSerializer.Deserialize<IEnumerable<KCUserGroupDto>>(content)
+            ?? throw new NullReferenceException("Failed to get groups");
+        return groups.First(group => group.Name == groupName).Id;
+    }
 }

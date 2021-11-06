@@ -13,4 +13,6 @@ public class MemberDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     
     public DbSet<Pupil> Pupils => Set<Pupil>();
+
+    public DbSet<Teacher> Teachers => Set<Teacher>();
 }

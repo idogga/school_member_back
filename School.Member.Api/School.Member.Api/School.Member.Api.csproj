@@ -5,13 +5,8 @@
     <Nullable>enable</Nullable>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <IncludeOpenAPIAnalyzers>true</IncludeOpenAPIAnalyzers>
-    <UserSecretsId>5dd803da-db47-4db5-a41f-cc9e89746676</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Protobuf Include="**\*.proto" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="10.1.1" />
