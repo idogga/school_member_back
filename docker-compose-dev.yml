@@ -40,33 +40,6 @@ services:
       - 8081:8080    
     depends_on:
       - mailhog
-
-  # user-service:
-  #   container_name: user-service
-  #   build:
-  #     context: .
-  #     dockerfile: Api/TestDockerfile
-  #   environment:
-  #     - ASPNETCORE_ENVIRONMENT=Development
-  #     - Database__Host=jfdi_test_db
-  #     - Database__User=docker
-  #     - Database__Password=secret
-  #     - Database__InitialCatalog=jfdi_db
-  #     - Database__Port=5432
-  #     - Keycloak__ClientId=project-management-api
-  #     - Keycloak__AppClientId=project-management-api
-  #     - Keycloak__ClientSecret=97b28e69-f699-46a6-bb24-ee0a24db84d6
-  #     - Keycloak__Audience=account
-  #     - Keycloak__Realm=JFDI
-  #     - Keycloak__BaseUrl=http://keycloak:8080/
-  #     - Keycloak__RedirectUrl=https://fakedomain.com/USER_ID/register
-  #   depends_on: 
-  #    - keycloak
-  #   ports: 
-  #     - 8094:80
-  #     - 8095:443
-  #     - 8096:5000
-  #     - 8097:5001
   
   mailhog:
     container_name: mailhog
@@ -75,3 +48,46 @@ services:
       - 8025:8025
     depends_on:
       - database
+
+  redis:
+    image: redis
+
+  sentry:
+    image: sentry
+    links:
+     - redis
+     - database
+    ports:
+     - 9000:9000
+    environment:
+      SENTRY_SECRET_KEY: '12341234123412341234123412341234'
+      SENTRY_POSTGRES_HOST: database
+      SENTRY_DB_USER: docker
+      SENTRY_DB_PASSWORD: 1234
+      SENTRY_REDIS_HOST: redis
+
+  cron:
+    image: sentry
+    links:
+     - redis
+     - database
+    command: "sentry run cron"
+    environment:
+      SENTRY_SECRET_KEY: '12341234123412341234123412341234'
+      SENTRY_POSTGRES_HOST: database
+      SENTRY_DB_USER: docker
+      SENTRY_DB_PASSWORD: 1234
+      SENTRY_REDIS_HOST: redis
+
+  worker:
+    image: sentry
+    links:
+     - redis
+     - database
+    command: "sentry run worker"
+    environment:
+      SENTRY_SECRET_KEY: '12341234123412341234123412341234'
+      SENTRY_POSTGRES_HOST: database
+      SENTRY_DB_USER: docker
+      SENTRY_DB_PASSWORD: 1234
+      SENTRY_REDIS_HOST: redis

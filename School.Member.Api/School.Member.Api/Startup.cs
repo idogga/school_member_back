@@ -7,11 +7,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using System.Reflection;
+using System.IO;
+using Serilog;
+using Serilog.Context;
+using Microsoft.Extensions.Logging;
 
 namespace School.Member.Api
 {
@@ -36,7 +38,7 @@ namespace School.Member.Api
                 .AddJsonOptions(opt =>
                 {
                     opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-                    opt.JsonSerializerOptions.IgnoreNullValues = true;
+                    opt.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
                     opt.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
                 });
 
@@ -60,10 +62,7 @@ namespace School.Member.Api
                 cfg.AddProfile(new PupilProfile());
                 cfg.AddProfile(new TeachersProfile());
             });
-            services.AddSwaggerGen(c =>
-            {
-                c.SwaggerDoc("v1", new OpenApiInfo { Title = "WebApi", Version = "v1" });
-            });
+            AddSwaggerGen(services);
             services.AddScoped<IPupilService, PupilService>();
             services.AddScoped<ITeachersService, TeachersService>();
             services.AddSingleton<KeycloakConfig>(keycloakConfig);
@@ -74,22 +73,71 @@ namespace School.Member.Api
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
         {
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
             }
-            app.UseCors( c => c.AllowAnyOrigin().AllowAnyHeader().AllowAnyHeader());
-            app.UseForwardedHeaders();
-            app.UseHttpsRedirection();
-            app.UseRouting();
+            
+            loggerFactory.AddSerilog();
+            
             app.UseSwagger();
-            app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "WebApi v1"));
+
+            app.UseSwaggerUI(options =>
+            {
+                options.SwaggerEndpoint("/swagger/v1/swagger.json", "People");
+            });
+
+            app.UseCors(options =>
+            {
+                options.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+            });
+
+            app.UseForwardedHeaders();
+
+            app.UseHttpsRedirection();
+
+            app.UseRouting();
+            
+            app.UseSerilogRequestLogging();
+
             app.UseAuthentication();
+
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
         }
+
+        private void AddSwaggerGen(IServiceCollection services)
+        {
+            var oidcUrl = $"{keycloakConfig.BaseUrl}auth/realms/{keycloakConfig.Realm}/protocol/openid-connect/";
+
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo { Title = "People", Version = "v1" });
+                c.OperationFilter<SecurityRequirementsOperationFilter>();
+                c.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
+                {
+                    Type = SecuritySchemeType.OAuth2,
+                    Flows = new OpenApiOAuthFlows()
+                    {
+                        ClientCredentials = new OpenApiOAuthFlow()
+                        {
+                            AuthorizationUrl = new Uri($"{oidcUrl}auth"),
+                            TokenUrl = new Uri($"{oidcUrl}token"),
+                        },
+                    },
+                });
+
+                var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+                var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+                c.IncludeXmlComments(xmlPath);
+            });
+
+            // https://github.com/domaindrivendev/Swashbuckle.AspNetCore#systemtextjson-stj-vs-newtonsoft
+            // services.AddSwaggerGenNewtonsoftSupport();
+        }
+
     }
 }
