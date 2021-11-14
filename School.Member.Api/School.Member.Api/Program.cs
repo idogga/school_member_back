@@ -1,14 +1,13 @@
+﻿using System;
+using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
+using Serilog;
+using Serilog.Events;
 
 namespace School.Member.Api
 {
@@ -20,22 +19,35 @@ namespace School.Member.Api
                 .AddJsonFile("appsettings.json")
                 .Build();
 
+            Log.Logger = new LoggerConfiguration()
+                .ReadFrom
+                .Configuration(config)
+                .WriteTo.Console()
+                .WriteTo.Sentry(o =>
+                    {
+                        // Debug and higher are stored as breadcrumbs (default is Information)
+                        o.MinimumBreadcrumbLevel = LogEventLevel.Debug;
+                        // Warning and higher is sent as event (default is Error)
+                        o.MinimumEventLevel = LogEventLevel.Warning;
+                    })
+                .CreateLogger();
+
             try
             {
-                Console.WriteLine("Starting application...");
+                Log.Information("Starting application...");
                 var host = CreateHostBuilder(args).Build();
                 Migrate(host.Services);
                 host.Run();
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Application crashed.");
-                Console.WriteLine(ex);
+                Log.Fatal(ex, "Application crashed.");
             }
             finally
             {
-                Console.WriteLine("Application shut down.");
-            }        
+                Log.Information("Application shut down.");
+                Log.CloseAndFlush();
+            }
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
